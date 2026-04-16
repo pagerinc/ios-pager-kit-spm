@@ -17,7 +17,6 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/zoom/videosdk-ios.git", branch: "swift-package-manager"),
         .package(url: "https://github.com/pendo-io/pendo-mobile-sdk.git", from: "3.9.1"),
     ],
     targets: [
@@ -25,7 +24,7 @@ let package = Package(
             name: "PagerKitSDK",
             dependencies: [
                 "PagerKitBinary",
-                .product(name: "ZoomVideoSDK", package: "videosdk-ios"),
+                "ZoomVideoSDK",
                 .product(name: "Pendo", package: "pendo-mobile-sdk"),
             ],
             path: "Sources/PagerKit"
@@ -34,6 +33,11 @@ let package = Package(
             name: "PagerKitBinary",
             url: "https://pagerinc.jfrog.io/pagerinc/swift-release-local/PagerKit/PagerKit-\(version).xcframework.zip",
             checksum: checksum
+        ),
+        .binaryTarget(
+            name: "ZoomVideoSDK",
+            url: "https://github.com/zoom/videosdk-ios/releases/download/v2.4.12/ZoomVideoSDK.xcframework.zip",
+            checksum: "c60008b4571c102498697f0e049a714994aa09a44790f6d7287d2a6cac112ebd"
         ),
     ]
 )
