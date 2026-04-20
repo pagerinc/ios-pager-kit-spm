@@ -1,0 +1,65 @@
+name: Tag release
+
+# After the release-sync PR is merged to master, move (or create) the
+# version tag to point at the new HEAD. SwiftPM consumers resolve by
+# tag, so the tag MUST point at the current master for `from: "X.Y.Z"`
+# resolution to work.
+#
+# This triggers on any push to master that touches Package.swift,
+# which covers both automated release-sync PRs and manual bumps.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'Package.swift'
+
+jobs:
+  move-tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Use a PAT so we can push tags even if the repo has tag
+          # protection rules that GITHUB_TOKEN can't bypass.
+          token: ${{ secrets.RELEASE_PAT }}
+
+      - name: Extract version from Package.swift
+        id: version
+        run: |
+          VERSION=$(grep -E '^let version = ' Package.swift \
+                    | sed -E 's/.*"(.*)".*/\1/')
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not extract version from Package.swift"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Detected version: $VERSION"
+
+      - name: Move tag to current HEAD
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "pagerinc-release-bot"
+          git config user.email "ios@pager.com"
+
+          # Delete existing tag (locally and on remote) if it exists
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "Tag $VERSION exists locally — deleting"
+            git tag -d "$VERSION"
+          fi
+          if git ls-remote --exit-code --tags origin "$VERSION" >/dev/null 2>&1; then
+            echo "Tag $VERSION exists on remote — deleting"
+            git push origin ":refs/tags/$VERSION"
+          fi
+
+          # Recreate at current HEAD and push
+          git tag "$VERSION"
+          git push origin "$VERSION"
+          echo "Tag $VERSION now points at $(git rev-parse HEAD)"

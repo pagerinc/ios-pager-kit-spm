@@ -1,0 +1,34 @@
+name: CI
+
+# Resolves the package on every PR and on pushes to master.
+# Catches broken URLs, stale checksums, and malformed Package.swift
+# before they reach consumers.
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  resolve:
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Configure JFrog credentials
+        env:
+          JFROG_USER: ${{ secrets.JFROG_USER }}
+          JFROG_API_KEY: ${{ secrets.JFROG_API_KEY }}
+        run: |
+          if [ -z "$JFROG_USER" ] || [ -z "$JFROG_API_KEY" ]; then
+            echo "::error::JFROG_USER or JFROG_API_KEY secret not set on this repo."
+            exit 1
+          fi
+          printf 'machine pagerinc.jfrog.io\nlogin %s\npassword %s\n' \
+            "$JFROG_USER" "$JFROG_API_KEY" > "$HOME/.netrc"
+          chmod 600 "$HOME/.netrc"
+
+      - name: swift package resolve
+        run: swift package resolve

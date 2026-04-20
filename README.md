@@ -54,7 +54,41 @@ Then set permissions:
 chmod 600 ~/.netrc
 ```
 
+> **The `chmod 600` is not optional.** `curl`, `git`, and Swift Package
+> Manager all refuse to read a `.netrc` that is readable by other users
+> on the system — they will silently fall back to unauthenticated
+> requests and you will get a `401` on every resolve, with no hint
+> anywhere that `.netrc` is the culprit. If you see a `401` from JFrog,
+> check the permissions first.
+
 > Contact your team lead or IT for JFrog credentials if you don't have them.
+
+### Xcode vs Swift Package Manager CLI — known gotcha
+
+On a fresh environment where SwiftPM's shared cache is empty, you may
+hit a `badResponseStatusCode(401)` error when Xcode (or `xcodebuild
+-resolvePackageDependencies`) tries to download the PagerKit
+xcframework — **even when your `~/.netrc` is correctly configured**.
+
+This is because `xcodebuild` does not honor `~/.netrc` for binary
+target authentication the way the `swift package` CLI does. It's an
+Xcode limitation that affects every SwiftPM package with authenticated
+binary targets (ours, private Firebase distributions, etc.), not
+something specific to this package.
+
+**Workaround:** from a clone of this repo, run:
+
+```bash
+swift package resolve
+```
+
+The Swift CLI does honor `.netrc`, so it will successfully download and
+cache the xcframework in SwiftPM's shared cache (`~/Library/Caches/
+org.swift.swiftpm/`). Once cached, Xcode's subsequent resolve picks it
+up from the shared cache without needing to re-authenticate.
+
+You only need to do this once per machine (or any time the cache is
+cleared).
 
 ## Requirements
 

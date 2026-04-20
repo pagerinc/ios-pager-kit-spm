@@ -6,3 +6,5 @@ Packages/
 DerivedData/
 xcuserdata/
 Package.resolved
+
+.claude/
