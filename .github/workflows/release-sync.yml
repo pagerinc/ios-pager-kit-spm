@@ -80,6 +80,16 @@ jobs:
 
           git checkout -B "$BRANCH"
           git add Package.swift
+
+          # No-op dispatch: Package.swift already matches the payload
+          # (e.g. someone re-fired a dispatch for the current version).
+          # Exit cleanly rather than failing — nothing to sync.
+          if git diff --cached --quiet; then
+            echo "Package.swift already matches version=${VERSION}, checksum=${CHECKSUM}"
+            echo "Nothing to commit; treating as a successful no-op."
+            exit 0
+          fi
+
           git commit -m "Release ${VERSION}
 
           Automated bump from ios-pager-kit release pipeline.
