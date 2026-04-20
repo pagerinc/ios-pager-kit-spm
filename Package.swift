@@ -26,10 +26,11 @@ let package = Package(
         .package(url: "https://github.com/pendo-io/pendo-mobile-sdk.git", from: "3.9.1"),
     ],
     targets: [
-        // Wrapper target that forces the consumer to link PagerKit's transitive
-        // runtime dependencies (ZoomVideoSDK, ZoomTask, Pendo). Consumers import
-        // `PagerKit` (the product name), which resolves to the binary target's
-        // internal `PagerKit` module via `@_exported import` below.
+        // Wrapper target that forces the consumer to link PagerKit's
+        // transitive runtime dependencies (ZoomVideoSDK, ZoomTask, Pendo).
+        // Consumers import `PagerKit` (the product name), which resolves
+        // to the binary target's internal `PagerKit` module — not to this
+        // wrapper. See Sources/PagerKitWrapper/PagerKitWrapper.swift.
         .target(
             name: "PagerKitWrapper",
             dependencies: [
@@ -37,8 +38,7 @@ let package = Package(
                 "ZoomVideoSDK",
                 "ZoomTask",
                 .product(name: "Pendo", package: "pendo-mobile-sdk"),
-            ],
-            path: "Sources/PagerKit"
+            ]
         ),
         .binaryTarget(
             name: "PagerKitBinary",

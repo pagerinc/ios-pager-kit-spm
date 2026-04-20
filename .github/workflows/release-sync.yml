@@ -1,0 +1,107 @@
+name: Release sync
+
+# Triggered by ios-pager-kit's release pipeline after it uploads a new
+# xcframework to JFrog. Updates Package.swift with the new version and
+# checksum and opens a PR against master.
+#
+# Branch protection still requires the PR to get two approvals before
+# it can be merged — that is intentional. This automation removes the
+# manual "find the checksum, edit Package.swift, open the PR" grind,
+# not the human review.
+#
+# The dispatch payload must include:
+#   { "version": "X.Y.Z", "checksum": "<sha256>", "jfrog_repo": "<repo>" }
+#
+# `jfrog_repo` is typically either "swift-release" (production) or
+# "swift-release-local" (release candidates). If it differs from what
+# is currently in Package.swift, the URL template is updated too.
+
+on:
+  repository_dispatch:
+    types: [release-sync]
+
+jobs:
+  open-pr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Validate payload
+        run: |
+          if [ -z "${{ github.event.client_payload.version }}" ] \
+             || [ -z "${{ github.event.client_payload.checksum }}" ]; then
+            echo "::error::dispatch payload must include 'version' and 'checksum'"
+            exit 1
+          fi
+
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          # Use a PAT so the bot-created PR triggers the CI workflow.
+          # Without this, GITHUB_TOKEN-authored PRs skip CI and cannot
+          # satisfy branch-protection "CI must pass" rules.
+          token: ${{ secrets.RELEASE_PAT }}
+
+      - name: Update Package.swift
+        env:
+          VERSION: ${{ github.event.client_payload.version }}
+          CHECKSUM: ${{ github.event.client_payload.checksum }}
+          JFROG_REPO: ${{ github.event.client_payload.jfrog_repo }}
+        run: |
+          python3 - <<'PY'
+          import os, re, pathlib
+          path = pathlib.Path("Package.swift")
+          text = path.read_text()
+          text = re.sub(r'let version = ".*"',
+                        f'let version = "{os.environ["VERSION"]}"', text, count=1)
+          text = re.sub(r'let checksum = ".*"',
+                        f'let checksum = "{os.environ["CHECKSUM"]}"', text, count=1)
+          if os.environ.get("JFROG_REPO"):
+              text = re.sub(r'/pagerinc/(swift-release(?:-local)?)/PagerKit/',
+                            f'/pagerinc/{os.environ["JFROG_REPO"]}/PagerKit/', text)
+          path.write_text(text)
+          PY
+          echo "--- diff ---"
+          git diff Package.swift
+
+      - name: Commit, push, and open PR
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+          VERSION: ${{ github.event.client_payload.version }}
+          CHECKSUM: ${{ github.event.client_payload.checksum }}
+        run: |
+          set -euo pipefail
+          BRANCH="release/${VERSION}"
+          git config user.name "pagerinc-release-bot"
+          git config user.email "ios@pager.com"
+
+          git checkout -B "$BRANCH"
+          git add Package.swift
+          git commit -m "Release ${VERSION}
+
+          Automated bump from ios-pager-kit release pipeline.
+
+          Version:  ${VERSION}
+          Checksum: ${CHECKSUM}"
+          git push --force-with-lease --set-upstream origin "$BRANCH"
+
+          # Create (or update) the PR
+          if gh pr view "$BRANCH" >/dev/null 2>&1; then
+            echo "PR for $BRANCH already exists; pushed commit is attached"
+          else
+            gh pr create \
+              --title "Release ${VERSION}" \
+              --body "Automated sync from \`ios-pager-kit\` release pipeline.
+
+          - **Version:** \`${VERSION}\`
+          - **Checksum:** \`${CHECKSUM}\`
+
+          Two approvals required per branch protection. After merge, the
+          \`tag-release\` workflow will move the \`${VERSION}\` tag to the
+          new master HEAD." \
+              --base master \
+              --head "$BRANCH"
+          fi

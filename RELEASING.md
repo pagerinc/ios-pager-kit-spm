@@ -7,10 +7,63 @@ exists so SwiftPM consumers can depend on PagerKit without cloning the
 full development repo (example app, tests, Framework tooling, etc.).
 
 Every time a new version of PagerKit is released from `ios-pager-kit`,
-this repo needs a matching bump. The process is intentionally manual —
-a handful of minutes per release, no CI secrets, no cron jobs. If that
-ever becomes a real bottleneck, see the "Future automation" section at
-the bottom.
+this repo needs a matching bump. That bump is **automated** — the
+release pipeline in `ios-pager-kit` fires a webhook, this repo opens
+a PR, humans approve + merge, and a second workflow moves the tag.
+
+The rest of this document covers:
+
+- The automated flow, what it does, and what secrets it requires
+- How to do the bump manually if the automation is broken or the token
+  is missing
+
+---
+
+## Automated flow
+
+```
+ios-pager-kit release pipeline
+    │
+    ├─ uploads xcframework to JFrog
+    ├─ computes checksum
+    └─ fires repository_dispatch ──────┐
+                                       │
+                                       ▼
+                          ios-pager-kit-spm
+                          release-sync workflow
+                                       │
+                                       ├─ edits Package.swift
+                                       ├─ pushes release/X.Y.Z branch
+                                       └─ opens PR
+                                       │
+                                       ▼
+                          human approvers merge PR
+                                       │
+                                       ▼
+                          ios-pager-kit-spm
+                          tag-release workflow
+                                       │
+                                       └─ moves X.Y.Z tag to new HEAD
+```
+
+### Required secrets
+
+**In `ios-pager-kit` (CircleCI):**
+
+| Secret | Used by | What it does |
+|---|---|---|
+| `SPM_DISPATCH_TOKEN` | `update_spm_package` Fastfile lane | GitHub PAT with `repo` scope on `pagerinc/ios-pager-kit-spm`, used to fire the `repository_dispatch` webhook. |
+
+**In `ios-pager-kit-spm` (GitHub Actions → Settings → Secrets → Actions):**
+
+| Secret | Used by | What it does |
+|---|---|---|
+| `RELEASE_PAT` | `release-sync.yml` | GitHub PAT with `repo` + `workflow` scope on this repo. Must be a PAT (not `GITHUB_TOKEN`) so that the bot-authored PR actually triggers the `ci.yml` workflow and can satisfy the "CI must pass" branch protection rule. |
+| `JFROG_USER` | `ci.yml` | JFrog service account username for fetching the PagerKit xcframework during `swift package resolve`. |
+| `JFROG_API_KEY` | `ci.yml` | JFrog API key paired with `JFROG_USER`. |
+
+If any secret is missing, the automation fails loudly — it does not
+silently fall back. In that case, use the manual steps below.
 
 ---
 
@@ -27,7 +80,10 @@ see "Updating Zoom" below.
 
 ---
 
-## Release steps
+## Manual release steps (fallback)
+
+Only use these if the automation is broken, the PAT is missing, or
+you need to bump this repo outside of a normal `ios-pager-kit` release.
 
 ### 1. Get the new version and checksum
 
@@ -192,17 +248,25 @@ the `dependencies:` block.
 
 ---
 
-## Future automation
+## Maintaining the automation
 
-For today's release cadence, manual release is the cheapest option.
-If the cadence picks up or a different team takes over releases, the
-low-effort path forward would be:
+The three workflows under `.github/workflows/` are:
 
-- A GitHub Action in this repo triggered by a `repository_dispatch`
-  webhook from `ios-pager-kit`'s release pipeline
-- The webhook payload carries `version` and `checksum`
-- The action opens the PR automatically
+- **`ci.yml`** — runs `swift package resolve` on every PR and push to
+  master. Catches broken URLs, stale checksums, and malformed
+  `Package.swift` before consumers see them.
+- **`release-sync.yml`** — `repository_dispatch` listener. Updates
+  `Package.swift`, pushes a `release/X.Y.Z` branch, opens a PR.
+- **`tag-release.yml`** — watches master for `Package.swift` changes,
+  moves (or creates) the version tag to the new HEAD.
 
-This avoids the pitfalls of a pull-based sync script (having to
-re-download ~60 MB xcframeworks just to compute the checksum, and
-maintaining JFrog credentials in two places).
+The three pieces are independent — breaking one does not break the
+others. If `release-sync.yml` fails, fall back to the manual steps
+above; `tag-release.yml` will still move the tag after the manual PR
+merges. If `tag-release.yml` fails, move the tag by hand and the
+consumer experience is unaffected once it's done.
+
+The dispatch-based design was chosen over a pull-based sync script
+because it avoids re-downloading the ~60 MB xcframework just to
+compute a checksum, and keeps JFrog credentials scoped to one repo
+(this one, for CI — the main repo already has them for upload).
