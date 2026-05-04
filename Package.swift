@@ -2,8 +2,8 @@
 
 import PackageDescription
 
-let version = "4.3.0"
-let checksum = "1746698c750672bdcc65a3f0e326c036fc160a9cda958eef07f506a5d63ed20d"
+let version = "4.4.0-rc.4"
+let checksum = "e68cd0f5b0ad5a7a346f3500dcf399545df1a1ad80f5ceabb6718c83552692a6"
 
 // ZoomVideoSDK xcframework + its transitive dyld dependencies.
 // PagerKit.xcframework directly links against `ZoomVideoSDK`; `ZoomVideoSDK`
