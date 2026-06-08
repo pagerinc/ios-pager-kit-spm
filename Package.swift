@@ -6,9 +6,13 @@ let version = "4.4.0"
 let checksum = "1de5ec6688ca6733da1bf0eed5754878ece134223fbd43ede86df6af99c8eee0"
 
 // ZoomVideoSDK xcframework + its transitive dyld dependencies.
-// PagerKit.xcframework directly links against `ZoomVideoSDK`; `ZoomVideoSDK`
-// has a runtime `@rpath` dependency on `ZoomTask` that must also be linked.
-// Both pinned to v2.4.12 from Zoom's official GitHub releases.
+// PagerKit.xcframework directly links against `ZoomVideoSDK`, `CptShare`,
+// `zoomcml` and `zm_annoter_dynamic` (see `otool -L PagerKit.framework/PagerKit`);
+// `ZoomVideoSDK` additionally has a runtime `@rpath` dependency on `ZoomTask`.
+// All of these must be linked (and therefore embedded by the consuming app)
+// or dyld aborts at launch with e.g.
+// "Library not loaded: @rpath/CptShare.framework/CptShare".
+// All pinned to v2.4.12 from Zoom's official GitHub releases.
 let zoomVersion = "v2.4.12"
 
 let package = Package(
@@ -37,6 +41,9 @@ let package = Package(
                 "PagerKitBinary",
                 "ZoomVideoSDK",
                 "ZoomTask",
+                "CptShare",
+                "zoomcml",
+                "zm_annoter_dynamic",
                 .product(name: "Pendo", package: "pendo-mobile-sdk"),
             ]
         ),
@@ -54,6 +61,21 @@ let package = Package(
             name: "ZoomTask",
             url: "https://github.com/zoom/videosdk-ios/releases/download/\(zoomVersion)/ZoomTask.xcframework.zip",
             checksum: "1c912bb69e3060be21583c3b8897f11f68ae63d883c1d4d851e3e6ab8a300ddb"
+        ),
+        .binaryTarget(
+            name: "CptShare",
+            url: "https://github.com/zoom/videosdk-ios/releases/download/\(zoomVersion)/CptShare.xcframework.zip",
+            checksum: "95a50c7511019c4bff8e359ad292536eb1b727a8ce1eb957fbf73d5cace19899"
+        ),
+        .binaryTarget(
+            name: "zoomcml",
+            url: "https://github.com/zoom/videosdk-ios/releases/download/\(zoomVersion)/zoomcml.xcframework.zip",
+            checksum: "5d4576c60ea44aead52cb49f2d6ac0eecbb8f35c57d6452a759caddf691a06d1"
+        ),
+        .binaryTarget(
+            name: "zm_annoter_dynamic",
+            url: "https://github.com/zoom/videosdk-ios/releases/download/\(zoomVersion)/zm_annoter_dynamic.xcframework.zip",
+            checksum: "92989278e8c663f137dd2f26dd96ed605af06f1f3d64d374ff5ef14aae082cae"
         ),
     ]
 )
