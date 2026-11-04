@@ -29,7 +29,7 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/pendo-io/pendo-mobile-sdk.git", from: "3.9.1"),
+        .package(url: "https://github.com/pendo-io/pendo-mobile-sdk.git", from: "3.14.4"),
     ],
     targets: [
         // Wrapper target that forces the consumer to link PagerKit's
