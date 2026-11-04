@@ -2,8 +2,8 @@
 
 import PackageDescription
 
-let version = "4.6.1"
-let checksum = "441909b6734cad76b968646bbd0556c72c69dbf415f76ec0151a5d31c0f672fd"
+let version = "5.0.0-rc.2"
+let checksum = "d3a40a66bb1126289733329bdbaddcf88f95b30f4312474a984213fcb52c7f06"
 
 // ZoomVideoSDK xcframework + its transitive dyld dependencies.
 // PagerKit.xcframework directly links against `ZoomVideoSDK`, `CptShare`,
@@ -51,7 +51,7 @@ let package = Package(
         ),
         .binaryTarget(
             name: "PagerKitBinary",
-            url: "https://pagerinc.jfrog.io/pagerinc/swift-release/PagerKit/PagerKit-\(version).xcframework.zip",
+            url: "https://pagerinc.jfrog.io/pagerinc/swift-release-local/PagerKit/PagerKit-\(version).xcframework.zip",
             checksum: checksum
         ),
         .binaryTarget(
